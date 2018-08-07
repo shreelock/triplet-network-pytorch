@@ -21,7 +21,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N',
+parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
@@ -31,7 +31,7 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=20, metavar='N',
+parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--margin', type=float, default=0.2, metavar='M',
                     help='margin for triplet loss (default: 0.2)')
@@ -175,13 +175,14 @@ def train(train_loader, tnet, criterion, optimizer, epoch):
         optimizer.step()
 
         if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{}]\t'
-                  'Loss: {:.4f} ({:.4f}) \t'
-                  'Acc: {:.2f}% ({:.2f}%) \t'
-                  'Emb_Norm: {:.2f} ({:.2f})'.format(
-                epoch, batch_idx * len(data1), len(train_loader.dataset),
-                losses.val, losses.avg,
-                       100. * accs.val, 100. * accs.avg, emb_norms.val, emb_norms.avg))
+            logline = 'Train Epoch: {} [{}/{}]\tLoss: {:.4f} ({:.4f}) \tAcc: {:.2f}% ({:.2f}%) \tEmb_Norm: {:.2f} ({:.2f})\n'\
+                .format(epoch, batch_idx * len(data1), len(train_loader.dataset),losses.val, losses.avg,
+                       100. * accs.val, 100. * accs.avg, emb_norms.val, emb_norms.avg)
+
+            with open("logs.txt", 'a') as logfile:
+                logfile.write(logline)
+
+            print(logline.strip())
     # log avg values to somewhere
     # plotter.plot('acc', 'train', epoch, accs.avg)
     # plotter.plot('loss', 'train', epoch, losses.avg)
@@ -212,8 +213,14 @@ def test(test_loader, tnet, criterion, epoch):
         accs.update(acc, data1.size(0))
         losses.update(test_loss, data1.size(0))
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {:.2f}%\n'.format(
-        losses.avg, 100. * accs.avg))
+    testlogline = '\nTest set: Average loss: {:.4f}, Accuracy: {:.2f}%\n'.format(losses.avg, 100. * accs.avg)
+
+    with open("logs.txt", 'a') as logfile:
+        logfile.write(testlogline)
+
+    print(testlogline.strip())
+
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {:.2f}%\n'.format(losses.avg, 100. * accs.avg))
     # plotter.plot('acc', 'test', epoch, accs.avg)
     # plotter.plot('loss', 'test', epoch, losses.avg)
     return accs.avg
@@ -272,7 +279,7 @@ class AverageMeter(object):
 def accuracy(dista, distb):
     margin = 0
     pred = (dista - distb - margin).cpu().data
-    return (pred > 0).sum() * 1.0 / dista.size()[0]
+    return float((pred > 0).sum()) / dista.size()[0]
 
 
 if __name__ == '__main__':

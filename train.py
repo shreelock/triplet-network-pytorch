@@ -251,7 +251,7 @@ class AverageMeter(object):
 def accuracy(dista, distb):
     margin = 0
     pred = (dista - distb - margin).cpu().data
-    return (pred > 0).sum()*1.0/dista.size()[0]
+    return float((pred > 0).sum()) / dista.size()[0]
 
 if __name__ == '__main__':
     main()
