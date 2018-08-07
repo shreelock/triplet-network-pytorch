@@ -152,7 +152,7 @@ class MNIST_t(data.Dataset):
         for class_idx in range(10):
             a = np.random.choice(np.where(np_labels==class_idx)[0], int(ntriplets/10), replace=True)
             b = np.random.choice(np.where(np_labels==class_idx)[0], int(ntriplets/10), replace=True)
-            while np.any((a-b)==0):
+            while np.any((a-b)==0): # so that no two indices are same
                 np.random.shuffle(b)
             c = np.random.choice(np.where(np_labels!=class_idx)[0], int(ntriplets/10), replace=True)
 

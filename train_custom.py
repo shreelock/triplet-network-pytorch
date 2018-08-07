@@ -54,24 +54,36 @@ def main():
     # plotter = VisdomLinePlotter(env_name=args.name)
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
+
+    train_triplet_path_file = "triplet_paths_train.txt"
+    train_triplet_idx_file = "triplet_index_train.txt"
+    val_triplet_path_file = "triplet_paths_val.txt"
+    val_triplet_idx_file = "triplet_index_val.txt"
     train_loader = torch.utils.data.DataLoader(
-        MNIST_t('../data', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
+        TripletImageLoader(filenames_filename=train_triplet_path_file,
+                           triplets_file_name=train_triplet_idx_file,
+                           transform=transforms.Compose([
+                               transforms.Resize((28, 28)),
+                               transforms.ToTensor(),
+                               transforms.Normalize((0.1307,), (0.3081,))
+                           ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
+
+
     test_loader = torch.utils.data.DataLoader(
-        MNIST_t('../data', train=False, transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
+        TripletImageLoader(filenames_filename=val_triplet_path_file,
+                           triplets_file_name=val_triplet_idx_file,
+                           transform=transforms.Compose([
+                               transforms.Resize((28, 28)),
+                               transforms.ToTensor(),
+                               transforms.Normalize((0.1307,), (0.3081,))
+                           ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
     class Net(nn.Module):
         def __init__(self):
             super(Net, self).__init__()
-            self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+            self.conv1 = nn.Conv2d(3, 10, kernel_size=5)
             self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
             self.conv2_drop = nn.Dropout2d()
             self.fc1 = nn.Linear(320, 50)
@@ -99,13 +111,13 @@ def main():
             best_prec1 = checkpoint['best_prec1']
             tnet.load_state_dict(checkpoint['state_dict'])
             print("=> loaded checkpoint '{}' (epoch {})"
-                    .format(args.resume, checkpoint['epoch']))
+                  .format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
-    criterion = torch.nn.MarginRankingLoss(margin = args.margin)
+    criterion = torch.nn.MarginRankingLoss(margin=args.margin)
     optimizer = optim.SGD(tnet.parameters(), lr=args.lr, momentum=args.momentum)
 
     n_parameters = sum([p.data.nelement() for p in tnet.parameters()])
@@ -125,6 +137,7 @@ def main():
             'state_dict': tnet.state_dict(),
             'best_prec1': best_acc,
         }, is_best)
+
 
 def train(train_loader, tnet, criterion, optimizer, epoch):
     losses = AverageMeter()
@@ -154,7 +167,7 @@ def train(train_loader, tnet, criterion, optimizer, epoch):
         acc = accuracy(dista, distb)
         losses.update(loss_triplet.data[0], data1.size(0))
         accs.update(acc, data1.size(0))
-        emb_norms.update(loss_embedd.data[0]/3, data1.size(0))
+        emb_norms.update(loss_embedd.data[0] / 3, data1.size(0))
 
         # compute gradient and do optimizer step
         optimizer.zero_grad()
@@ -168,11 +181,12 @@ def train(train_loader, tnet, criterion, optimizer, epoch):
                   'Emb_Norm: {:.2f} ({:.2f})'.format(
                 epoch, batch_idx * len(data1), len(train_loader.dataset),
                 losses.val, losses.avg,
-                100. * accs.val, 100. * accs.avg, emb_norms.val, emb_norms.avg))
+                       100. * accs.val, 100. * accs.avg, emb_norms.val, emb_norms.avg))
     # log avg values to somewhere
     # plotter.plot('acc', 'train', epoch, accs.avg)
     # plotter.plot('loss', 'train', epoch, losses.avg)
     # plotter.plot('emb_norms', 'train', epoch, emb_norms.avg)
+
 
 def test(test_loader, tnet, criterion, epoch):
     losses = AverageMeter()
@@ -191,7 +205,7 @@ def test(test_loader, tnet, criterion, epoch):
         if args.cuda:
             target = target.cuda()
         target = Variable(target)
-        test_loss =  criterion(dista, distb, target).data[0]
+        test_loss = criterion(dista, distb, target).data[0]
 
         # measure accuracy and record loss
         acc = accuracy(dista, distb)
@@ -204,25 +218,29 @@ def test(test_loader, tnet, criterion, epoch):
     # plotter.plot('loss', 'test', epoch, losses.avg)
     return accs.avg
 
+
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     """Saves checkpoint to disk"""
-    directory = "runs/%s/"%(args.name)
+    directory = "runs/%s/" % (args.name)
     if not os.path.exists(directory):
         os.makedirs(directory)
     filename = directory + filename
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'runs/%s/'%(args.name) + 'model_best.pth.tar')
+        shutil.copyfile(filename, 'runs/%s/' % (args.name) + 'model_best.pth.tar')
+
 
 class VisdomLinePlotter(object):
     """Plots to Visdom"""
+
     def __init__(self, env_name='main'):
         self.viz = Visdom()
         self.env = env_name
         self.plots = {}
+
     def plot(self, var_name, split_name, x, y):
         if var_name not in self.plots:
-            self.plots[var_name] = self.viz.line(X=np.array([x,x]), Y=np.array([y,y]), env=self.env, opts=dict(
+            self.plots[var_name] = self.viz.line(X=np.array([x, x]), Y=np.array([y, y]), env=self.env, opts=dict(
                 legend=[split_name],
                 title=var_name,
                 xlabel='Epochs',
@@ -231,8 +249,10 @@ class VisdomLinePlotter(object):
         else:
             self.viz.line(X=np.array([x]), Y=np.array([y]), env=self.env, win=self.plots[var_name], name=split_name)
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -248,10 +268,12 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+
 def accuracy(dista, distb):
     margin = 0
     pred = (dista - distb - margin).cpu().data
-    return (pred > 0).sum()*1.0/dista.size()[0]
+    return (pred > 0).sum() * 1.0 / dista.size()[0]
+
 
 if __name__ == '__main__':
     main()
