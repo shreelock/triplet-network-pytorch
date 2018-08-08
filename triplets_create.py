@@ -9,18 +9,24 @@ similar to image c than it is to image b, e.g.,
 0 2017 42 """
 
 if __name__ == '__main__':
-    root_dir = "../auto-encoder/Caltech256/backup/"
+    root_dir = "../caltech-data/"
+    triplet_data_dir = os.path.join(root_dir, "triplet_data")
+
+    if not os.path.exists(triplet_data_dir):
+        os.mkdir(triplet_data_dir)
 
     train_root_dir = os.path.join(root_dir, "images", "train")
-    train_triplet_path_file = "./triplet_files/triplet_paths_train.txt"
-    train_triplet_idx_file = "./triplet_files/triplet_index_train.txt"
+    train_triplet_path_file = os.path.join(triplet_data_dir, "triplet_paths_train.txt")
+    train_triplet_idx_file = os.path.join(triplet_data_dir, "triplet_index_train.txt")
+
     train_tot_items = len(os.listdir(train_root_dir))
     ttif = open(train_triplet_idx_file, "a")
     ttpf = open(train_triplet_path_file, "a")
 
     val_root_dir = os.path.join(root_dir, "images", "val")
-    val_triplet_path_file = "./triplet_files/triplet_paths_val.txt"
-    val_triplet_idx_file = "./triplet_files/triplet_index_val.txt"
+    val_triplet_path_file = os.path.join(triplet_data_dir, "triplet_paths_val.txt")
+    val_triplet_idx_file = os.path.join(triplet_data_dir, "triplet_index_val.txt")
+
     val_tot_items = len(os.listdir(val_root_dir))
     vtif = open(val_triplet_idx_file, "a")
     vtpf = open(val_triplet_path_file, "a")

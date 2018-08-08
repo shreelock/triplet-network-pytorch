@@ -51,10 +51,13 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-    train_triplet_path_file = "./triplet_files/triplet_paths_train.txt"
-    train_triplet_idx_file = "./triplet_files/triplet_index_train.txt"
-    val_triplet_path_file = "./triplet_files/triplet_paths_val.txt"
-    val_triplet_idx_file = "./triplet_files/triplet_index_val.txt"
+    root_dir = "../caltech-data/"
+    triplet_data_dir = os.path.join(root_dir, "triplet_data")
+    train_triplet_path_file = os.path.join(triplet_data_dir, "triplet_paths_train.txt")
+    train_triplet_idx_file = os.path.join(triplet_data_dir, "triplet_index_train.txt")
+    val_triplet_path_file = os.path.join(triplet_data_dir, "triplet_paths_val.txt")
+    val_triplet_idx_file = os.path.join(triplet_data_dir, "triplet_index_val.txt")
+
     train_loader = torch.utils.data.DataLoader(
         TripletImageLoader(filenames_filename=train_triplet_path_file,
                            triplets_file_name=train_triplet_idx_file,
