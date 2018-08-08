@@ -3,23 +3,19 @@ import argparse
 import os
 import shutil
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import transforms
 from torch.autograd import Variable
 import torch.backends.cudnn as cudnn
-from triplet_mnist_loader import MNIST_t
 from triplet_image_loader import TripletImageLoader
 from tripletnet import Tripletnet
-from visdom import Visdom
-import numpy as np
+from embeddingnet import Vgg_Net
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+parser.add_argument('--batch-size', type=int, default=2, metavar='N',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
+parser.add_argument('--test-batch-size', type=int, default=2, metavar='N',
                     help='input batch size for testing (default: 1000)')
 parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 10)')
@@ -55,15 +51,15 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-    train_triplet_path_file = "triplet_paths_train.txt"
-    train_triplet_idx_file = "triplet_index_train.txt"
-    val_triplet_path_file = "triplet_paths_val.txt"
-    val_triplet_idx_file = "triplet_index_val.txt"
+    train_triplet_path_file = "./triplet_files/triplet_paths_train.txt"
+    train_triplet_idx_file = "./triplet_files/triplet_index_train.txt"
+    val_triplet_path_file = "./triplet_files/triplet_paths_val.txt"
+    val_triplet_idx_file = "./triplet_files/triplet_index_val.txt"
     train_loader = torch.utils.data.DataLoader(
         TripletImageLoader(filenames_filename=train_triplet_path_file,
                            triplets_file_name=train_triplet_idx_file,
                            transform=transforms.Compose([
-                               transforms.Resize((28, 28)),
+                               transforms.Resize((224, 224)),
                                transforms.ToTensor(),
                                transforms.Normalize((0.1307,), (0.3081,))
                            ])),
@@ -74,31 +70,15 @@ def main():
         TripletImageLoader(filenames_filename=val_triplet_path_file,
                            triplets_file_name=val_triplet_idx_file,
                            transform=transforms.Compose([
-                               transforms.Resize((28, 28)),
+                               transforms.Resize((224, 224)),
                                transforms.ToTensor(),
                                transforms.Normalize((0.1307,), (0.3081,))
                            ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
-    class Net(nn.Module):
-        def __init__(self):
-            super(Net, self).__init__()
-            self.conv1 = nn.Conv2d(3, 10, kernel_size=5)
-            self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-            self.conv2_drop = nn.Dropout2d()
-            self.fc1 = nn.Linear(320, 50)
-            self.fc2 = nn.Linear(50, 10)
-
-        def forward(self, x):
-            x = F.relu(F.max_pool2d(self.conv1(x), 2))
-            x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-            x = x.view(-1, 320)
-            x = F.relu(self.fc1(x))
-            x = F.dropout(x, training=self.training)
-            return self.fc2(x)
-
-    model = Net()
-    tnet = Tripletnet(model)
+    embedingnet = Vgg_Net()
+    tnet = Tripletnet(embedingnet)
+    print (tnet)
     if args.cuda:
         tnet.cuda()
 
@@ -183,10 +163,6 @@ def train(train_loader, tnet, criterion, optimizer, epoch):
                 logfile.write(logline)
 
             print(logline.strip())
-    # log avg values to somewhere
-    # plotter.plot('acc', 'train', epoch, accs.avg)
-    # plotter.plot('loss', 'train', epoch, losses.avg)
-    # plotter.plot('emb_norms', 'train', epoch, emb_norms.avg)
 
 
 def test(test_loader, tnet, criterion, epoch):
@@ -221,8 +197,6 @@ def test(test_loader, tnet, criterion, epoch):
     print(testlogline.strip())
 
     print('\nTest set: Average loss: {:.4f}, Accuracy: {:.2f}%\n'.format(losses.avg, 100. * accs.avg))
-    # plotter.plot('acc', 'test', epoch, accs.avg)
-    # plotter.plot('loss', 'test', epoch, losses.avg)
     return accs.avg
 
 
@@ -235,26 +209,6 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, 'runs/%s/' % (args.name) + 'model_best.pth.tar')
-
-
-class VisdomLinePlotter(object):
-    """Plots to Visdom"""
-
-    def __init__(self, env_name='main'):
-        self.viz = Visdom()
-        self.env = env_name
-        self.plots = {}
-
-    def plot(self, var_name, split_name, x, y):
-        if var_name not in self.plots:
-            self.plots[var_name] = self.viz.line(X=np.array([x, x]), Y=np.array([y, y]), env=self.env, opts=dict(
-                legend=[split_name],
-                title=var_name,
-                xlabel='Epochs',
-                ylabel=var_name
-            ))
-        else:
-            self.viz.line(X=np.array([x]), Y=np.array([y]), env=self.env, win=self.plots[var_name], name=split_name)
 
 
 class AverageMeter(object):
